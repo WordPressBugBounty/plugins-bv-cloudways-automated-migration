@@ -2,9 +2,9 @@
 Contributors: blogvault, akshatc
 Tags: Cloudways, migration
 Requires at least: 4.0
-Tested up to: 6.6
+Tested up to: 6.7
 Requires PHP: 5.6.0
-Stable tag: 5.56
+Stable tag: 5.88
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,10 @@ wp plugin install bv-cloudways-automated-migration
 We require an email address to send you updates on the migration process, notify you of any errors that occur during the migration.
 
 == Changelog ==
+= 5.88 =
+* Tweak: Code Restructuring
+* Tweak: Added support for PHP 8.4
+
 = 5.56 =
 * Better handling for Activate Redirect
 
@@ -161,7 +165,7 @@ We require an email address to send you updates on the migration process, notify
 * Updating tested upto 5.0
 
 = 1.77 =
-* Adding function_exists for getmyuid and get_current_user functions 
+* Adding function_exists for getmyuid and get_current_user functions
 
 = 1.76 =
 * Removing create_funtion for PHP 7.2 compatibility
