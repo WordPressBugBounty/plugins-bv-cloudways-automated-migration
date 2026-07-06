@@ -32,4 +32,9 @@
 			<input type="submit" name="submit" id="migratesubmit" class="migrate-button mt-3" value="MIGRATE" disabled>
 		</form>
 	</div>
+	<?php if (CWSHelper::getRawParam('GET', 'connection_key') === 'true') : ?>
+		<div class="card connection-key-card">
+			<?php $this->connectionKeyField(); ?>
+		</div>
+	<?php endif; ?>
 </main>

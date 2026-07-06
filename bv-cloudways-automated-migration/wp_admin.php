@@ -14,6 +14,7 @@ class CWSWPAdmin {
 		$this->siteinfo = $siteinfo;
 		$this->bvapi = $bvapi;
 		$this->bvinfo = new CWSInfo($this->settings);
+		add_action('wp_ajax_cws_connection_key', array($this, 'ajaxConnectionKey'));
 	}
 
 	public function mainUrl($_params = '') {
@@ -25,13 +26,15 @@ class CWSWPAdmin {
 	}
 
 	function removeAdminNotices() {
-		if (array_key_exists('page', $_REQUEST) && $_REQUEST['page'] == $this->bvinfo->plugname) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if (CWSHelper::getRawParam('REQUEST', 'page') === $this->bvinfo->plugname) {
 			remove_all_actions('admin_notices');
 			remove_all_actions('all_admin_notices');
 		}
 	}
 
 	public function initHandler() {
+		$this->handleConnectionKeyRefresh();
+
 		if (!current_user_can('activate_plugins'))
 			return;
 
@@ -59,7 +62,8 @@ class CWSWPAdmin {
 
 		if ($slug === $bvslug && is_array($brand) && array_key_exists('hide_plugin_details', $brand)) {
 			foreach ($plugin_metas as $pluginKey => $pluginValue) {
-				if (strpos($pluginValue, sprintf('>%s<', translate('View details')))) {
+				// phpcs:ignore WordPress.WP.I18n.MissingArgDomain
+				if (strpos($pluginValue, sprintf('>%s<', __('View details')))) {
 					unset($plugin_metas[$pluginKey]);
 					break;
 				}
@@ -70,6 +74,7 @@ class CWSWPAdmin {
 
 	public function settingsLink($links, $file) {
 		if ( $file == plugin_basename( dirname(__FILE__).'/cloudways.php' ) ) {
+			// phpcs:ignore WordPress.WP.I18n.MissingArgDomain
 			$links[] = '<a href="'.$this->mainUrl().'">'.__( 'Settings' ).'</a>';
 		}
 		return $links;
@@ -77,8 +82,10 @@ class CWSWPAdmin {
 
 	public function cwssecAdminMenu($hook) {
 		if ($hook === 'toplevel_page_cloudways') {
-			wp_enqueue_style('cwssurface', plugins_url( 'assets/css/style.css', __FILE__ ));
-			wp_enqueue_style('cwssurface');
+			$style_file = dirname( __FILE__ ) . '/assets/css/style.css';
+			$style_version = file_exists($style_file) ? filemtime($style_file) : $this->bvinfo->version;
+			wp_enqueue_style('dashicons');
+			wp_enqueue_style('cwssurface', plugins_url( 'assets/css/style.css', __FILE__ ), array('dashicons'), $style_version);
 		}
 	}
 
@@ -102,18 +109,142 @@ class CWSWPAdmin {
 		require_once dirname( __FILE__ ) . '/recover.php';
 		$secret = CWSRecover::defaultSecret($this->settings);
 		$public = CWSAccount::getApiPublicKey($this->settings);
+		$server_ip = CWSHelper::getStringParamEscaped('SERVER', 'SERVER_ADDR', 'attr');
 		$tags = "<input type='hidden' name='url' value='".esc_attr($this->siteinfo->wpurl())."'/>\n".
-				"<input type='hidden' name='homeurl' value='".esc_attr($this->siteinfo->homeurl())."'/>\n".
-				"<input type='hidden' name='siteurl' value='".esc_attr($this->siteinfo->siteurl())."'/>\n".
-				"<input type='hidden' name='dbsig' value='".esc_attr($this->siteinfo->dbsig(false))."'/>\n".
-				"<input type='hidden' name='plug' value='".esc_attr($this->bvinfo->plugname)."'/>\n".
-				"<input type='hidden' name='adminurl' value='".esc_attr($this->mainUrl())."'/>\n".
-				"<input type='hidden' name='bvversion' value='".esc_attr($this->bvinfo->version)."'/>\n".
-	 			"<input type='hidden' name='serverip' value='".esc_attr(wp_unslash($_SERVER["SERVER_ADDR"]))."'/>\n".
-				"<input type='hidden' name='abspath' value='".esc_attr(ABSPATH)."'/>\n".
-				"<input type='hidden' name='secret' value='".esc_attr($secret)."'/>\n".
-				"<input type='hidden' name='public' value='".esc_attr($public)."'/>\n";
+			"<input type='hidden' name='homeurl' value='".esc_attr($this->siteinfo->homeurl())."'/>\n".
+			"<input type='hidden' name='siteurl' value='".esc_attr($this->siteinfo->siteurl())."'/>\n".
+			"<input type='hidden' name='dbsig' value='".esc_attr($this->siteinfo->dbsig(false))."'/>\n".
+			"<input type='hidden' name='plug' value='".esc_attr($this->bvinfo->plugname)."'/>\n".
+			"<input type='hidden' name='adminurl' value='".esc_attr($this->mainUrl())."'/>\n".
+			"<input type='hidden' name='bvversion' value='".esc_attr($this->bvinfo->version)."'/>\n".
+			"<input type='hidden' name='serverip' value='".$server_ip."'/>\n".
+			"<input type='hidden' name='abspath' value='".esc_attr(ABSPATH)."'/>\n".
+			"<input type='hidden' name='secret' value='".esc_attr($secret)."'/>\n".
+			"<input type='hidden' name='public' value='".esc_attr($public)."'/>\n";
 		return $tags;
+	}
+
+	public function connectionKey() {
+		return $this->bvinfo->getConnectionKey();
+	}
+
+	public function ajaxConnectionKey() {
+		if (!current_user_can('manage_options')) {
+			wp_send_json_error(array('message' => 'Unauthorized'), 403);
+		}
+
+		nocache_headers();
+		wp_send_json_success(array(
+			'connection_key' => $this->connectionKey(),
+			'site_url' => $this->siteinfo->siteurl()
+		));
+	}
+
+	public function handleConnectionKeyRefresh() {
+		if (CWSHelper::getRawParam('POST', 'cws_refresh_connection_key') !== '1') {
+			return;
+		}
+
+		if (!current_user_can('manage_options')) {
+			wp_die(esc_html('You do not have permission to refresh the connection key.'));
+		}
+
+		check_admin_referer('cws_refresh_connection_key', 'cws_refresh_connection_key_nonce');
+		require_once dirname( __FILE__ ) . '/recover.php';
+		CWSRecover::refreshDefaultSecret($this->settings);
+
+		wp_safe_redirect($this->mainUrl('&connection_key=true&cws_key_refreshed=1'));
+		exit;
+	}
+
+	public function connectionKeyField() {
+		$connection_key = $this->connectionKey();
+		$key_refreshed = CWSHelper::getRawParam('GET', 'cws_key_refreshed') === '1';
+		?>
+			<div class="connection-key-container">
+				<div class="connection-key-header">
+					<div>
+						<label class="connection-key-title" for="cws-connection-key">Connection Key</label>
+					</div>
+					<?php if ($key_refreshed) : ?>
+						<div class="connection-key-status">Refreshed</div>
+					<?php endif; ?>
+				</div>
+				<div class="connection-key-control">
+					<div class="connection-key-lock">
+						<span class="dashicons dashicons-lock" aria-hidden="true"></span>
+					</div>
+					<input id="cws-connection-key" type="password" readonly class="connection-key-input" value="<?php echo esc_attr($connection_key); ?>" onfocus="this.select();" aria-label="Connection Key">
+					<button type="button" class="connection-key-icon-button connection-key-reveal-button" onclick="cwsToggleConnectionKey(this, 'cws-connection-key');" aria-label="Show connection key" title="Show connection key">
+						<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+					</button>
+				</div>
+				<div class="connection-key-actions">
+					<button type="button" class="connection-key-action-button" onclick="cwsCopyConnectionKey(this, 'cws-connection-key');" aria-label="Copy connection key" title="Copy connection key">
+						<span class="dashicons dashicons-clipboard" aria-hidden="true"></span>
+						<span>Copy</span>
+					</button>
+					<form class="connection-key-refresh-form" method="post" action="<?php echo esc_url($this->mainUrl('&connection_key=true')); ?>">
+						<input type="hidden" name="cws_refresh_connection_key" value="1">
+						<?php wp_nonce_field('cws_refresh_connection_key', 'cws_refresh_connection_key_nonce'); ?>
+						<button type="submit" class="connection-key-action-button" onclick="return window.confirm('Refresh this connection key? Existing copied keys will stop working.');" aria-label="Refresh connection key" title="Refresh connection key">
+							<span class="dashicons dashicons-update" aria-hidden="true"></span>
+							<span>Refresh</span>
+						</button>
+					</form>
+				</div>
+			</div>
+			<script type="text/javascript">
+				function cwsToggleConnectionKey(button, inputId) {
+					var input = document.getElementById(inputId);
+					if (!input) {
+						return;
+					}
+
+					var isHidden = input.type === 'password';
+					input.type = isHidden ? 'text' : 'password';
+					button.setAttribute('aria-label', isHidden ? 'Hide connection key' : 'Show connection key');
+					button.setAttribute('title', isHidden ? 'Hide connection key' : 'Show connection key');
+
+					var icon = button.querySelector('.dashicons');
+					if (icon) {
+						icon.classList.toggle('dashicons-visibility', !isHidden);
+						icon.classList.toggle('dashicons-hidden', isHidden);
+					}
+				}
+
+				function cwsCopyConnectionKey(button, inputId) {
+					var input = document.getElementById(inputId);
+					if (!input) {
+						return;
+					}
+
+					var originalLabel = button.getAttribute('aria-label') || 'Copy connection key';
+					var markCopied = function() {
+						button.setAttribute('aria-label', 'Connection key copied');
+						button.setAttribute('title', 'Connection key copied');
+						button.classList.add('copied');
+						window.setTimeout(function() {
+							button.setAttribute('aria-label', originalLabel);
+							button.setAttribute('title', originalLabel);
+							button.classList.remove('copied');
+						}, 1600);
+					};
+					var fallbackCopy = function() {
+						input.focus();
+						input.select();
+						document.execCommand('copy');
+						markCopied();
+					};
+
+					if (navigator.clipboard && window.isSecureContext) {
+						navigator.clipboard.writeText(input.value).then(markCopied).catch(fallbackCopy);
+					} else {
+						fallbackCopy();
+					}
+				}
+			</script>
+		<?php
 	}
 
 	public function activateWarning() {

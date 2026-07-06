@@ -11,7 +11,7 @@ if (!class_exists('CWSInfo')) :
 		public $ip_header_option = 'cwsipheader';
 		public $brand_option = 'cwsbrand';
 		public $wp_lp_whitelabel_option = 'cwsLpWhitelabelConf';
-		public $version = '5.88';
+		public $version = '6.55';
 		public $webpage = 'https://www.cloudways.com';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'bv-cloudways-automated-migration/cloudways.php';
@@ -86,25 +86,10 @@ if (!class_exists('CWSInfo')) :
 		}
 
 		public static function getRequestID() {
-			if (!defined("BV_REQUEST_ID")) {
-				define("BV_REQUEST_ID", uniqid(mt_rand())); // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
+			if (!defined("CWS_REQUEST_ID")) {
+				define("CWS_REQUEST_ID", uniqid(mt_rand())); // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
 			}
-			return BV_REQUEST_ID;
-		}
-
-		public function canSetCWBranding() {
-			if (CWSWPSiteInfo::isCWServer()) {
-
-				$bot_protect_accounts = CWSAccount::accountsByType($this->settings, 'botprotect');
-				if (sizeof($bot_protect_accounts) >= 1)
-					return true;
-
-				$bot_protect_accounts = CWSAccount::accountsByPattern($this->settings, 'email', '/@cw_user\.com$/');
-				if (sizeof($bot_protect_accounts) >= 1)
-					return true;
-			}
-
-			return false;
+			return CWS_REQUEST_ID;
 		}
 
 		public function canWhiteLabel($slug = NULL) {
@@ -162,7 +147,6 @@ if (!class_exists('CWSInfo')) :
 			if (is_array($brand) && array_key_exists('menuname', $brand)) {
 				return $brand['menuname'];
 			}
-		  
 			return $this->brandname;
 		}
 

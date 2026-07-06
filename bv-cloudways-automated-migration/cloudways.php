@@ -5,7 +5,7 @@ Plugin URI: https://www.cloudways.com
 Description: The easiest way to migrate your site to cloudways
 Author: Cloudways
 Author URI: https://www.cloudways.com
-Version: 5.88
+Version: 6.55
 Network: True
 License: GPLv2 or later
 License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
@@ -40,6 +40,7 @@ require_once dirname( __FILE__ ) . '/wp_actions.php';
 require_once dirname( __FILE__ ) . '/info.php';
 require_once dirname( __FILE__ ) . '/account.php';
 require_once dirname( __FILE__ ) . '/helper.php';
+require_once dirname( __FILE__ ) . '/wp_file_system.php';
 ##WP_2FA_REQUIRE_FILE##
 ##WP_LOGIN_WHITELABEL_REQUIRE_FILE##
 ##WPCACHEMODULE##
@@ -66,7 +67,13 @@ add_action('cws_clear_bv_services_config', array($wp_action, 'clear_bv_services_
 
 ##DISABLE_OTHER_OPTIMIZATION_PLUGINS##
 
-##WPCLIMODULE##
+if (defined('WP_CLI') && WP_CLI) {
+		require_once dirname( __FILE__ ) . '/wp_cli.php';
+		$wp_cli = new CWSWPCli($bvsettings, $bvinfo, $bvsiteinfo, $bvapi);
+		WP_CLI::add_command("bv-cloudways-migration", $wp_cli);
+}
+
+
 if (is_admin()) {
 	require_once dirname( __FILE__ ) . '/wp_admin.php';
 	$wpadmin = new CWSWPAdmin($bvsettings, $bvsiteinfo);
@@ -81,11 +88,11 @@ if (is_admin()) {
 	}
 	add_filter('plugin_action_links', array($wpadmin, 'settingsLink'), 10, 2);
 	add_action('admin_head', array($wpadmin, 'removeAdminNotices'), 3);
+
+	##MG_AJAX_ACTIONS##
 	##POPUP_ON_DEACTIVATION##
 	##ACTIVATEWARNING##
 	add_action('admin_enqueue_scripts', array($wpadmin, 'cwssecAdminMenu'));
-	##ALPURGECACHEFUNCTION##
-	##ALADMINMENU##
 }
 
 if ((array_key_exists('bvreqmerge', $_POST)) || (array_key_exists('bvreqmerge', $_GET))) { // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
@@ -99,34 +106,30 @@ if ($bvinfo->hasValidDBVersion()) {
 	##MAINTENANCEMODULE##
 }
 
-if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "cloudways")) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if (CWSHelper::getRawParam('REQUEST', 'bvplugname') == "cloudways") {
 	require_once dirname( __FILE__ ) . '/callback/base.php';
 	require_once dirname( __FILE__ ) . '/callback/response.php';
 	require_once dirname( __FILE__ ) . '/callback/request.php';
 	require_once dirname( __FILE__ ) . '/recover.php';
 
-	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Recommended
-	$pubkey = isset($_REQUEST['pubkey']) ? CWSAccount::sanitizeKey(wp_unslash($_REQUEST['pubkey'])) : '';
+	$pubkey = CWSHelper::getRawParam('REQUEST', 'pubkey');
+	$pubkey = isset($pubkey) ? CWSAccount::sanitizeKey($pubkey) : '';
+	$rcvracc = CWSHelper::getRawParam('REQUEST', 'rcvracc');
 
-	if (array_key_exists('rcvracc', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if (isset($rcvracc)) {
 		$account = CWSRecover::find($bvsettings, $pubkey);
 	} else {
 		$account = CWSAccount::find($bvsettings, $pubkey);
 	}
 
-	$request = new BVCallbackRequest($account, $_REQUEST, $bvsettings); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-	$response = new BVCallbackResponse($request->bvb64cksize);
+	$request = new CWSCallbackRequest($account, $_REQUEST, $bvsettings); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$response = new CWSCallbackResponse($request->bvb64cksize);
 
 	if ($request->authenticate() === 1) {
-		if (array_key_exists('bv_ignr_frm_cptch', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			##DISABLE_CAPTCHA_IN_FORM_PLUGINS##
-		}
-
-		if (array_key_exists('bv_ignr_eml', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			##DISABLE_EMAIL_IN_FORM_PLUGINS##
-		}
-
-		if (!array_key_exists('bv_ignr_frm_cptch', $_REQUEST) && !array_key_exists('bv_ignr_eml', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$bv_frm_tstng = CWSHelper::getRawParam('REQUEST', 'bv_frm_tstng');
+		if (isset($bv_frm_tstng)) {
+			##FORM_TESTING##
+		} else {
 			##BVBASEPATH##
 
 			require_once dirname( __FILE__ ) . '/callback/handler.php';
@@ -136,7 +139,7 @@ if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "
 				$response->terminate($request->corruptedParamsResp());
 			}
 			$request->params = $params;
-			$callback_handler = new BVCallbackHandler($bvdb, $bvsettings, $bvsiteinfo, $request, $account, $response);
+			$callback_handler = new CWSCallbackHandler($bvdb, $bvsettings, $bvsiteinfo, $request, $account, $response);
 			if ($request->is_afterload) {
 				add_action('wp_loaded', array($callback_handler, 'execute'));
 			} else if ($request->is_admin_ajax) {
@@ -162,3 +165,4 @@ if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "
 ##WP2FAMODULE##
 ##WP_LOGIN_WHITELABEL_MODULE##
 ##CLEAR_WP_2FA_CONFIG_ACTION##
+##PLUGIN_LOADED_MODULE##

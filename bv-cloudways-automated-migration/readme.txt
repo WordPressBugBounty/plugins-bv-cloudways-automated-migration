@@ -1,10 +1,10 @@
 === Cloudways WordPress Migrator ===
-Contributors: akshatc, cloudways
+Contributors: blogvault, akshatc
 Tags: Cloudways, migration
 Requires at least: 4.0
-Tested up to: 6.9
-Requires PHP: 5.6.0
-Stable tag: 5.88
+Tested up to: 7.0
+Requires PHP: 7.0
+Stable tag: 6.55
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,9 @@ wp plugin install bv-cloudways-automated-migration
 We require an email address to send you updates on the migration process, notify you of any errors that occur during the migration.
 
 == Changelog ==
+= 6.55 =
+* Tweak: Connection key support
+
 = 5.88 =
 * Tweak: Code Restructuring
 * Tweak: Added support for PHP 8.4
