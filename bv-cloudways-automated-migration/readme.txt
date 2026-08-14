@@ -2,9 +2,9 @@
 Contributors: blogvault, akshatc
 Tags: Cloudways, migration
 Requires at least: 4.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.0
-Stable tag: 6.55
+Stable tag: 6.65
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,6 +71,11 @@ wp plugin install bv-cloudways-automated-migration
 We require an email address to send you updates on the migration process, notify you of any errors that occur during the migration.
 
 == Changelog ==
+= 6.65 =
+* Improvement: Enhanced secret generation using the secure random_int function.
+* Improvement: Improved connection key generation mechanism.
+* Improvement: Optimized migration of large database tables.
+
 = 6.55 =
 * Tweak: Connection key support
 

@@ -5,7 +5,7 @@ Plugin URI: https://www.cloudways.com
 Description: The easiest way to migrate your site to cloudways
 Author: Cloudways
 Author URI: https://www.cloudways.com
-Version: 6.55
+Version: 6.65
 Network: True
 License: GPLv2 or later
 License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
@@ -117,7 +117,9 @@ if (CWSHelper::getRawParam('REQUEST', 'bvplugname') == "cloudways") {
 	$rcvracc = CWSHelper::getRawParam('REQUEST', 'rcvracc');
 
 	if (isset($rcvracc)) {
-		$account = CWSRecover::find($bvsettings, $pubkey);
+		$bvctag = CWSHelper::getRawParam('REQUEST', 'bvctag');
+		$bvctag = isset($bvctag) ? CWSAccount::sanitizeKey($bvctag) : null;
+		$account = CWSRecover::find($bvsettings, $pubkey, $bvctag);
 	} else {
 		$account = CWSAccount::find($bvsettings, $pubkey);
 	}
@@ -140,7 +142,9 @@ if (CWSHelper::getRawParam('REQUEST', 'bvplugname') == "cloudways") {
 			}
 			$request->params = $params;
 			$callback_handler = new CWSCallbackHandler($bvdb, $bvsettings, $bvsiteinfo, $request, $account, $response);
-			if ($request->is_afterload) {
+			if ($request->is_aftershutdown) {
+				$callback_handler->deferExecutionUntilShutdown();
+			} else if ($request->is_afterload) {
 				add_action('wp_loaded', array($callback_handler, 'execute'));
 			} else if ($request->is_admin_ajax) {
 				add_action('wp_ajax_bvadm', array($callback_handler, 'bvAdmExecuteWithUser'));
@@ -157,7 +161,7 @@ if (CWSHelper::getRawParam('REQUEST', 'bvplugname') == "cloudways") {
 		##PROTECTMODULE##
 		##DYNSYNCMODULE##
 	}
-	##WPAUTOUPDATEBLOCKMODULE##
+	
 	##HIDEPLUGINUPDATEMODULE##
 	##THIRDPARTYCACHINGMODULE##
 }

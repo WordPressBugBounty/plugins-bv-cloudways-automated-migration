@@ -11,7 +11,7 @@ if (!class_exists('CWSInfo')) :
 		public $ip_header_option = 'cwsipheader';
 		public $brand_option = 'cwsbrand';
 		public $wp_lp_whitelabel_option = 'cwsLpWhitelabelConf';
-		public $version = '6.55';
+		public $version = '6.65';
 		public $webpage = 'https://www.cloudways.com';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'bv-cloudways-automated-migration/cloudways.php';
@@ -64,14 +64,15 @@ if (!class_exists('CWSInfo')) :
 			$bvsiteinfo = new CWSWPSiteInfo();
 			$encoded_url = base64_encode($bvsiteinfo->siteurl());
 			$secret = CWSRecover::defaultSecret($this->settings);
+			$tag = CWSRecover::connectionTag($this->settings);
 
-			return base64_encode("v2:".$secret.":".$encoded_url.":".$this->plugname);
-		}
+			#No tag means this site has no salt material in wp-config.php, and there
+			#is no connection key that would be safe to hand out.
+			if (empty($secret) || empty($tag)) {
+				return null;
+			}
 
-		public function getDefaultSecret() {
-			require_once dirname( __FILE__ ) . '/recover.php';
-			$bvsiteinfo = new CWSWPSiteInfo();
-			return CWSRecover::defaultSecret($this->settings);
+			return base64_encode("v3:".$secret.":".$encoded_url.":".$this->plugname.":".$tag);
 		}
 
 		public function getLatestElementorDBVersion($file) {
