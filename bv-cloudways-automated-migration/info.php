@@ -11,7 +11,7 @@ if (!class_exists('CWSInfo')) :
 		public $ip_header_option = 'cwsipheader';
 		public $brand_option = 'cwsbrand';
 		public $wp_lp_whitelabel_option = 'cwsLpWhitelabelConf';
-		public $version = '6.65';
+		public $version = '6.72';
 		public $webpage = 'https://www.cloudways.com';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'bv-cloudways-automated-migration/cloudways.php';
